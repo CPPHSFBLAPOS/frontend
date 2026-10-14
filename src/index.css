@@ -1,0 +1,260 @@
+@import 'tailwindcss';
+
+/*
+ * The store's look: a purchase-order desk. Navy band with a gold rule,
+ * white paper cards on a cool gray desk, condensed Archivo headings, Public
+ * Sans for text and IBM Plex Mono for every number. Every color is a token
+ * so dark mode is one block of overrides.
+ */
+:root {
+  --desk: #e6eaf0;
+  --paper: #ffffff;
+  --field: #f2f4f8;
+  --ink: #121a2b;
+  --ink-2: #465369;
+  --ink-3: #69758b;
+  --rule: #d5dbe5;
+  --rule-2: #a8b3c5;
+  --band: #17295a;
+  --band-ink: #f4f6fb;
+  --band-ink-2: #b8c3dd;
+  --navy: #1f3f8f;
+  --on-navy: #ffffff;
+  --navy-soft: #e5ebf8;
+  --gold: #d99e1c;
+  --gold-soft: #fbf1d8;
+  --pen: #1c3da3;
+  --good: #16764a;
+  --good-soft: #e1f2e9;
+  --warn: #965600;
+  --warn-soft: #fcefd8;
+  --bad: #ad2a20;
+  --bad-soft: #fbe4e1;
+  --shadow: 0 1px 0 rgba(18, 26, 43, 0.05), 0 12px 30px -16px rgba(18, 26, 43, 0.22);
+  --shadow-lift: 0 1px 0 rgba(18, 26, 43, 0.05), 0 18px 40px -18px rgba(18, 26, 43, 0.35);
+  --scrim: rgba(9, 14, 28, 0.55);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --desk: #0c1220;
+    --paper: #141d30;
+    --field: #1a2540;
+    --ink: #e7ecf5;
+    --ink-2: #a9b4c8;
+    --ink-3: #8590a7;
+    --rule: #28344e;
+    --rule-2: #46557b;
+    --band: #0a1530;
+    --band-ink: #e7ecf5;
+    --band-ink-2: #93a2c4;
+    --navy: #93b1ff;
+    --on-navy: #0c1220;
+    --navy-soft: #1c2a4d;
+    --gold: #f0bf4f;
+    --gold-soft: #372b12;
+    --pen: #a8c0ff;
+    --good: #5ccb96;
+    --good-soft: #123428;
+    --warn: #f2ad4e;
+    --warn-soft: #3a2a12;
+    --bad: #ff8b80;
+    --bad-soft: #3d1d1b;
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.25), 0 12px 30px -16px rgba(0, 0, 0, 0.6);
+    --shadow-lift: 0 1px 0 rgba(0, 0, 0, 0.3), 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+    --scrim: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --desk: #0c1220;
+  --paper: #141d30;
+  --field: #1a2540;
+  --ink: #e7ecf5;
+  --ink-2: #a9b4c8;
+  --ink-3: #8590a7;
+  --rule: #28344e;
+  --rule-2: #46557b;
+  --band: #0a1530;
+  --band-ink: #e7ecf5;
+  --band-ink-2: #93a2c4;
+  --navy: #93b1ff;
+  --on-navy: #0c1220;
+  --navy-soft: #1c2a4d;
+  --gold: #f0bf4f;
+  --gold-soft: #372b12;
+  --pen: #a8c0ff;
+  --good: #5ccb96;
+  --good-soft: #123428;
+  --warn: #f2ad4e;
+  --warn-soft: #3a2a12;
+  --bad: #ff8b80;
+  --bad-soft: #3d1d1b;
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.25), 0 12px 30px -16px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 1px 0 rgba(0, 0, 0, 0.3), 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  --scrim: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-desk: var(--desk);
+  --color-paper: var(--paper);
+  --color-field: var(--field);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-2: var(--rule-2);
+  --color-band: var(--band);
+  --color-band-ink: var(--band-ink);
+  --color-band-ink-2: var(--band-ink-2);
+  --color-navy: var(--navy);
+  --color-on-navy: var(--on-navy);
+  --color-navy-soft: var(--navy-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-pen: var(--pen);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-scrim: var(--scrim);
+  --shadow-card: var(--shadow);
+  --shadow-lift: var(--shadow-lift);
+  --font-display: 'Archivo', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Public Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--desk);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
+  }
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  .display {
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    letter-spacing: 0.005em;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .input {
+    width: 100%;
+    min-width: 0;
+    background: var(--field);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-bottom-color: var(--rule-2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    transition:
+      border-color 120ms,
+      box-shadow 120ms,
+      background 120ms;
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--navy);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--navy) 22%, transparent);
+  }
+  .input:disabled {
+    opacity: 0.7;
+  }
+  .label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .section-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 5px;
+    margin-bottom: 14px;
+  }
+  .section-h h2 {
+    font-family: var(--font-display);
+    font-stretch: 82%;
+    font-weight: 700;
+    font-size: 14.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .training-stripes {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--gold-soft) 0 14px,
+      color-mix(in srgb, var(--gold) 28%, var(--gold-soft)) 14px 28px
+    );
+  }
+  .shimmer {
+    background: linear-gradient(90deg, var(--field) 0%, var(--paper) 50%, var(--field) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.3s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}

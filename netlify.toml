@@ -1,0 +1,29 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The backend repo is its own Netlify site that only serves functions.
+# Proxying /api/* to it keeps the browser on one origin (no CORS) and keeps
+# every secret key on the backend site. Replace the host with the backend
+# site's URL.
+[[redirects]]
+  from = "/api/*"
+  to = "https://cpphs-fbla-store-api.netlify.app/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"

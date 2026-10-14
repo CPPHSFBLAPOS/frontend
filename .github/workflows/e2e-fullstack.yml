@@ -1,0 +1,44 @@
+# The full-stack end-to-end tests: the real database (backend repo's
+# migrations and seed), the real functions, and this app. Run it by hand
+# before merging a phase. The backend repo is private, so the workflow needs
+# a read-only token for it in the BACKEND_REPO_TOKEN secret.
+name: E2E (full stack)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fullstack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: CPPHSFBLAPOS/backend
+          token: ${{ secrets.BACKEND_REPO_TOKEN }}
+          path: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase (migrations + seed)
+        working-directory: backend
+        run: |
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+          supabase status -o env > ../supabase.env
+      - name: Start the functions
+        working-directory: backend
+        run: |
+          set -a; . ../supabase.env; set +a
+          export SUPABASE_URL="$API_URL" SUPABASE_ANON_KEY="$ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          npm ci
+          npx netlify-cli dev --offline --port 8888 > ../netlify.log 2>&1 &
+          npx wait-on -t 120000 http://localhost:8888/.netlify/functions/health
+      - run: npm ci && npx playwright install --with-deps chromium
+      - name: Run
+        run: |
+          set -a; . ./supabase.env; set +a
+          export VITE_SUPABASE_URL="$API_URL" VITE_SUPABASE_ANON_KEY="$ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
+          E2E_FULLSTACK=1 npm run e2e
