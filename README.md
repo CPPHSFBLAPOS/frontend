@@ -51,7 +51,11 @@ The full-stack run needs `supabase start` and `netlify dev` running in the backe
 
 ## Deploying
 
-1. Create a Netlify site from this repo on the store's team. Build command and publish directory come from `netlify.toml`.
-2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the site's build settings. They are public by design; never add a secret with a `VITE_` prefix.
-3. In `netlify.toml`, point the `/api/*` redirect at the backend site's URL.
-4. Pull requests get deploy previews (free). Merge to `main` about once a week to save credits.
+Deploy the backend first (its README's Deploying section covers Supabase and the functions site).
+
+1. Make `main` the default branch of this repo. Netlify uses the default branch as production.
+2. In `netlify.toml`, point the `/api/*` redirect at the backend site's real address. It is `https://cpphs-fbla-store-api.netlify.app` only if the backend site was renamed to exactly that; otherwise members' sign-in tokens would go to whoever owns that name.
+3. Create a Netlify site from this repo on the store's team, production branch `main`, deploy previews on, branch deploys off. Build command and publish directory come from `netlify.toml`.
+4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the site's build settings. They are public by design; never add a secret with a `VITE_` prefix.
+5. On the first deploy preview, open `/api/health` (every `configured` flag should be true), sign in with an emailed code, and run one Sam's Club lookup.
+6. Pull requests get deploy previews (free). Merge to `main` about once a week to save credits.
