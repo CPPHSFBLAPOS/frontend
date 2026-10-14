@@ -496,7 +496,7 @@ export function CloseShiftModal({
             </motion.div>
           </div>
           <AnimatePresence>
-            {approval && counted > 0 && (
+            {approval && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="grid gap-3 overflow-hidden md:col-span-2">
                 <Field label={`Off by more than ${formatCents(tolerance)}: what happened?`}>
                   <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />

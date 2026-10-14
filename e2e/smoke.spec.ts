@@ -26,7 +26,36 @@ test('sign-in asks for a school email, then the code', async ({ page }) => {
   await page.getByLabel('School email').fill('treasurer@example.com');
   await page.getByRole('button', { name: 'Email me a code' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
-  await expect(page.getByLabel('Digit 1')).toBeVisible();
+  await expect(page.getByLabel('Code from your email')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
+});
+
+test('a pasted 8-digit code is kept whole and sent with Enter', async ({ page }) => {
+  await mockBackend(page, null);
+  await page.goto('/');
+  await page.getByLabel('School email').fill('treasurer@example.com');
+  await page.getByRole('button', { name: 'Email me a code' }).click();
+  const box = page.getByLabel('Code from your email');
+  await expect(box).toBeVisible();
+
+  const verifies: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/auth/v1/verify')) verifies.push(String(r.postDataJSON()?.token));
+  });
+  // Paste "8765 4321" the way a phone does, with the space.
+  await box.focus();
+  await box.evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', '8765 4321');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(box).toHaveValue('87654321');
+  await page.waitForTimeout(300);
+  expect(verifies).toEqual([]);
+
+  const verify = page.waitForRequest('**/auth/v1/verify');
+  await box.press('Enter');
+  expect((await verify).postDataJSON().token).toBe('87654321');
 });
 
 test('home shows the system checks and the officer actions', async ({ page }) => {
@@ -99,9 +128,16 @@ test('a barcode scan adds the item with that UPC', async ({ page }) => {
   await mockBackend(page, register, { my_open_shifts: () => [shift], shift_summary: () => ({ ...shift, sales: [], handoffs: [], by_method: {} }) });
   await page.goto('/register');
   await expect(page.getByRole('button', { name: /Nacho Chips 1 oz/ })).toBeVisible();
-  // A scanner types fast and ends with Enter.
-  await page.keyboard.type('012345678929', { delay: 5 });
-  await page.keyboard.press('Enter');
+  // A scanner types fast and ends with Enter. Playwright's keyboard sends one
+  // key per round trip, which on a busy machine can leave gaps longer than the
+  // scanner limit, so send the burst from inside the page like a scanner does.
+  await page.evaluate((code) => {
+    const target = document.activeElement ?? document.body;
+    for (const key of [...code, 'Enter']) {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      target.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }));
+    }
+  }, '012345678929');
   await expect(page.locator('li').filter({ hasText: 'Nacho Chips 1 oz' })).toBeVisible();
 });
 

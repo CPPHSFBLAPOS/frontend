@@ -54,7 +54,7 @@ const ACTIONS = [
   { to: '/register', label: 'Open the register', body: 'Shift, sales, voids and refunds', icon: ShoppingCart, perm: 'ring_sales' as const },
   { to: '/preauth', label: 'Pre-auth purchases', body: 'Sam’s Club requests and approvals', icon: ClipboardSignature, perm: 'preauth_view' as const },
   { to: '/inventory', label: 'Inventory', body: 'Products, prices, counts', icon: Boxes, perm: 'edit_products' as const },
-  { to: '/gift-cards', label: 'Gift cards', body: 'Issue, look up, print', icon: CreditCard, perm: 'sell_gift_cards' as const },
+  { to: '/gift-cards', label: 'Gift cards', body: 'Issue, look up, print', icon: CreditCard, perm: 'issue_promo' as const },
   { to: '/reports', label: 'Reports', body: 'Dashboard and Treasurer reports', icon: BarChart3, perm: 'view_reports' as const },
 ];
 

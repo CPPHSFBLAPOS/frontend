@@ -63,7 +63,9 @@ const router = createBrowserRouter([
       { path: 'inventory', element: <Need perm="edit_products"><Inventory /></Need> },
       { path: 'preauth', element: <Need perm="preauth_view"><PreauthList /></Need> },
       { path: 'preauth/:id', element: <Need perm="preauth_view"><PreauthDetail /></Need> },
-      { path: 'gift-cards', element: <Need perm="sell_gift_cards"><GiftCards /></Need> },
+      // Officers only: the card list and balances are readable only with
+      // issue_promo. Cashiers sell, load and check cards at the register.
+      { path: 'gift-cards', element: <Need perm="issue_promo"><GiftCards /></Need> },
       { path: 'reports', element: <Need perm="view_reports"><Reports /></Need> },
       { path: 'log', element: <Need perm={['view_log', 'ring_sales']}><Log /></Need> },
       { path: 'members', element: <Need perm="manage_members"><Members /></Need> },

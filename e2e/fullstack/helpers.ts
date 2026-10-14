@@ -6,8 +6,9 @@ import { expect, type Page } from '@playwright/test';
 const url = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Signs in through the real sign-in screen. The 6-digit code comes from the
-// local admin API instead of an inbox.
+// Signs in through the real sign-in screen. The code (6 to 10 digits,
+// whatever the project sends) comes from the local admin API instead of an
+// inbox.
 export async function signIn(page: Page, email: string) {
   if (!serviceKey) throw new Error('Set SUPABASE_SERVICE_ROLE_KEY (printed by `supabase start`).');
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
@@ -17,7 +18,9 @@ export async function signIn(page: Page, email: string) {
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
   const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
   if (error) throw error;
-  await page.getByLabel('Digit 1').fill(data.properties.email_otp);
+  const code = page.getByLabel('Code from your email');
+  await code.fill(data.properties.email_otp);
+  await code.press('Enter');
   await expect(page.getByRole('heading', { name: 'CPPHS FBLA Store' })).toBeVisible({ timeout: 15_000 });
 }
 

@@ -10,6 +10,7 @@ import { useToast } from '../../components/Toast';
 import { Button, Card, ErrorNote, Field, Input, MoneyInput, PageHeader, Skeleton, Textarea, cx } from '../../components/ui';
 import { useSettings } from '../../hooks/queries';
 import { localISODate, schoolYear, weekdaysBetween } from '../../lib/dates';
+import { DEVICE_NAME_MAX } from '../../lib/device';
 import { centsToInput, parseDollars } from '../../lib/money';
 
 export default function SettingsPage() {
@@ -163,13 +164,14 @@ function SettingsForm({ initial }: { initial: Settings }) {
           <h2 className="display flex items-center gap-2 text-lg font-bold">
             <Laptop className="size-5" /> This device
           </h2>
-          <p className="text-sm text-ink-2">The transaction log records which device did each thing. Name this one (for example, “Store laptop”).</p>
+          <p className="text-sm text-ink-2">The transaction log records which device did each thing. Name this one (for example, “Store laptop”). Fancy quotes, dashes and emoji are turned into plain characters.</p>
           <div className="flex max-w-md gap-2">
-            <Input value={device} onChange={(e) => setDevice(e.target.value)} />
+            <Input value={device} onChange={(e) => setDevice(e.target.value)} maxLength={DEVICE_NAME_MAX} aria-label="Device name" />
             <Button
               onClick={() => {
-                setDeviceName(device);
-                toast.good('Device name saved', 'Reload the app for it to take effect.');
+                const saved = setDeviceName(device);
+                setDevice(saved);
+                toast.good(`Device name saved as “${saved}”`, 'Reload the app for it to take effect.');
               }}
             >
               Save name

@@ -35,7 +35,7 @@ jobs:
           export SUPABASE_URL="$API_URL" SUPABASE_ANON_KEY="$ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY"
           npm ci
           npx netlify-cli dev --offline --port 8888 > ../netlify.log 2>&1 &
-          npx wait-on -t 120000 http://localhost:8888/.netlify/functions/health
+          npx wait-on -t 120000 http-get://localhost:8888/.netlify/functions/health
       - run: npm ci && npx playwright install --with-deps chromium
       - name: Run
         run: |

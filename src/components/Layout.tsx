@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { to: '/register', label: 'Register', icon: ShoppingCart, perm: 'ring_sales' },
   { to: '/inventory', label: 'Inventory', icon: Boxes, perm: 'edit_products' },
   { to: '/preauth', label: 'Pre-auth', icon: ClipboardSignature, perm: 'preauth_view' },
-  { to: '/gift-cards', label: 'Gift cards', icon: CreditCard, perm: 'sell_gift_cards' },
+  { to: '/gift-cards', label: 'Gift cards', icon: CreditCard, perm: 'issue_promo' },
   { to: '/reports', label: 'Reports', icon: BarChart3, perm: 'view_reports' },
   { to: '/log', label: 'Log', icon: ScrollText, perm: ['view_log', 'ring_sales'] },
   { to: '/members', label: 'Members', icon: Users, perm: 'manage_members' },

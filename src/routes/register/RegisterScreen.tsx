@@ -12,12 +12,12 @@ import { Button, Card, Kbd, Pill, cx } from '../../components/ui';
 import { useCategories, useDirectory, useProducts } from '../../hooks/queries';
 import { useOnline } from '../../hooks/useOnline';
 import { formatTime } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
-import { enqueueSale, flushQueue, isNetworkError, queuedSales, removeSale, type QueuedSale } from '../../lib/offline';
+import { enqueueSale, flushQueue, isNetworkError, moveSaleToShift, queuedForShift, queuedSales, removeSale, retrySale, type QueuedSale } from '../../lib/offline';
 import { printGiftCards } from '../../lib/printCard';
 import { createScanDetector } from '../../lib/scanner';
 import { addLoad, addProduct, emptyCart, qtyInCart, toLinesInput, totals, type Cart } from './cart';
 import { CartPanel } from './CartPanel';
+import { FailedSales } from './FailedSales';
 import { OutagePanel } from './OutagePanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
@@ -62,7 +62,7 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
       void qc.invalidateQueries({ queryKey: ['products'] });
       void qc.invalidateQueries({ queryKey: ['shift', shift.id] });
     }
-    if (r.failed) toast.bad(`${r.failed} offline sale${r.failed === 1 ? '' : 's'} could not be saved`, 'Open the queue to see why.');
+    if (r.rejected) toast.bad(`${r.rejected} offline sale${r.rejected === 1 ? '' : 's'} could not be saved`, 'They are listed above the register with the reason.');
     refreshQueue();
   }, [qc, refreshQueue, shift.id, toast]);
   useEffect(() => {
@@ -148,6 +148,35 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
   const training = cart.type === 'training';
   const waiting = queue.filter((q) => !q.error).length;
   const failed = queue.filter((q) => q.error);
+  // Any queued sale (waiting or rejected) on this shift keeps it open: the
+  // drawer count would not match until the sale is saved or dismissed.
+  const queuedHere = queuedForShift(queue, shift.id);
+  const onThisShift = queuedHere.length;
+  const rejectedHere = queuedHere.filter((q) => q.error).length;
+  const waitingHere = onThisShift - rejectedHere;
+  const plural = (n: number) => (n === 1 ? '' : 's');
+  const closeHint = rejectedHere
+    ? `${rejectedHere} sale${plural(rejectedHere)} on this shift could not be saved. Retry or dismiss ${rejectedHere === 1 ? 'it' : 'them'} first.`
+    : waitingHere
+      ? `${waitingHere} sale${plural(waitingHere)} on this shift ${waitingHere === 1 ? 'is' : 'are'} still waiting to send. ${waitingHere === 1 ? 'It goes' : 'They go'} out when the server answers.`
+      : !online
+        ? 'Needs a connection.'
+        : undefined;
+
+  const retryFailed = async (sale: QueuedSale) => {
+    await retrySale(sale);
+    refreshQueue();
+    await flush();
+  };
+  const moveFailedHere = async (sale: QueuedSale) => {
+    await moveSaleToShift(sale, shift.id);
+    refreshQueue();
+    await flush();
+  };
+  const dismissFailed = async (sale: QueuedSale) => {
+    await removeSale(sale.client_uuid);
+    refreshQueue();
+  };
 
   return (
     <div className="pt-4">
@@ -207,7 +236,7 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
                   <MenuItem icon={HandCoins} label="Cash handoff" onClick={() => setModal('handoff')} disabled={!online} />
                   <MenuItem icon={RefreshCw} label={panel === 'outage' ? 'Back to selling' : 'Outage entry'} onClick={() => setParams(panel === 'outage' ? {} : { tab: 'outage' })} />
                   <MenuItem icon={ArrowLeftRight} label="Switch shift" onClick={onSwitch} />
-                  <MenuItem icon={Lock} label="Close shift" onClick={() => setModal('close')} disabled={!online || waiting > 0} />
+                  <MenuItem icon={Lock} label="Close shift" onClick={() => setModal('close')} disabled={!online || onThisShift > 0} hint={closeHint} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -225,23 +254,19 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
         onChange={(t) => setParams(t === 'outage' ? { tab: 'outage' } : {})}
       />
 
-      {failed.length > 0 && (
-        <Card className="mb-4 border-bad/50 p-4">
-          <p className="font-semibold text-bad">Offline sales the server would not take</p>
-          <ul className="mt-2 grid gap-1 text-sm">
-            {failed.map((f) => (
-              <li key={f.client_uuid} className="flex items-center justify-between gap-2">
-                <span>
-                  {formatCents(f.summary.total_cents)} at {formatTime(f.queued_at)}: {f.error}
-                </span>
-                <Button size="sm" variant="ghost" onClick={() => void removeSale(f.client_uuid).then(refreshQueue)}>
-                  Dismiss
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <AnimatePresence>
+        {failed.length > 0 && (
+          <FailedSales
+            sales={failed}
+            products={list}
+            shift={shift}
+            blocksClose={failed.some((f) => f.payload.p_shift_id === shift.id)}
+            onRetry={retryFailed}
+            onMoveHere={moveFailedHere}
+            onDismiss={dismissFailed}
+          />
+        )}
+      </AnimatePresence>
 
       {panel === 'outage' ? (
         <OutagePanel products={list} shift={shift} />
@@ -332,14 +357,19 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
   );
 }
 
-function MenuItem({ icon: Icon, label, onClick, disabled }: { icon: typeof Lock; label: string; onClick: () => void; disabled?: boolean }) {
+function MenuItem({ icon: Icon, label, onClick, disabled, hint }: { icon: typeof Lock; label: string; onClick: () => void; disabled?: boolean; hint?: string }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-field disabled:opacity-40"
+      title={disabled ? hint : undefined}
+      className="group flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-field disabled:cursor-not-allowed disabled:hover:bg-transparent"
     >
-      <Icon className="size-4 text-ink-3" /> {label}
+      <Icon className="mt-0.5 size-4 shrink-0 text-ink-3 group-disabled:opacity-40" />
+      <span className="grid">
+        <span className="group-disabled:opacity-40">{label}</span>
+        {disabled && hint && <span className="text-xs font-normal text-ink-2">{hint}</span>}
+      </span>
     </button>
   );
 }

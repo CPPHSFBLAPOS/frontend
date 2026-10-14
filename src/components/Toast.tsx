@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 type Tone = 'good' | 'bad' | 'info';
 type Toast = { id: number; tone: Tone; title: string; body?: string };
@@ -24,11 +24,28 @@ export function useToast() {
 const icons = { good: CheckCircle2, bad: AlertTriangle, info: Info };
 const colors = { good: 'text-good', bad: 'text-bad', info: 'text-navy' };
 const DURATION = 4.2;
+const PHONE = '(max-width: 639px)';
 
-// Toasts spring up from the bottom, stack, and shrink a progress line
-// while they wait to leave.
+// On a phone the register's checkout bar sits at the bottom of the screen, so
+// toasts drop in from the top there instead of covering it.
+function usePhone() {
+  const [phone, setPhone] = useState(() => window.matchMedia?.(PHONE).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(PHONE);
+    if (!mq) return;
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return phone;
+}
+
+// Toasts spring in from the bottom (the top on phones), stack, and shrink a
+// progress line while they wait to leave.
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const phone = usePhone();
+  const from = phone ? -24 : 24;
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
   const push = useCallback(
     (t: Omit<Toast, 'id'>) => {
@@ -43,7 +60,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={push}>
       {children}
       <div
-        className="pointer-events-none fixed inset-x-0 bottom-[calc(16px+env(safe-area-inset-bottom))] z-[60] flex flex-col items-center gap-2 px-4"
+        className={`pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4 ${
+          phone ? 'top-[calc(12px+env(safe-area-inset-top))]' : 'bottom-[calc(16px+env(safe-area-inset-bottom))]'
+        }`}
         aria-live="polite"
         role="status"
       >
@@ -54,9 +73,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <motion.div
                 key={t.id}
                 layout
-                initial={{ opacity: 0, y: 24, scale: 0.9 }}
+                initial={{ opacity: 0, y: from, scale: 0.9 }}
                 animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 420, damping: 30 } }}
-                exit={{ opacity: 0, y: 12, scale: 0.95, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: from / 2, scale: 0.95, transition: { duration: 0.15 } }}
                 className="pointer-events-auto relative w-full max-w-md overflow-hidden rounded-xl border border-rule bg-ink text-paper shadow-lift"
               >
                 <div className="flex items-start gap-3 px-4 py-3">

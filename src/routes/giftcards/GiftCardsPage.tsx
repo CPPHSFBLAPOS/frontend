@@ -2,7 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft, FileUp, Gift, Printer, Search, Sparkles } from 'lucide-react';
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { useState, type PointerEvent } from 'react';
-import { cardHistory, deactivateAndTransfer, importGiftCards, issueGiftCard, listGiftCards, lookupGiftCard, reloadGiftCard } from '../../api/giftCards';
+import {
+  GIFT_CARD_LIST_LIMIT,
+  cardHistory,
+  deactivateAndTransfer,
+  giftCardTotals,
+  importGiftCards,
+  issueGiftCard,
+  listGiftCards,
+  lookupGiftCard,
+  reloadGiftCard,
+} from '../../api/giftCards';
 import type { GiftCard } from '../../api/types';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { DataTable } from '../../components/DataTable';
@@ -131,6 +141,7 @@ function Lookup({ card, setCard }: { card: GiftCard | null; setCard: (c: GiftCar
     if (!card) return;
     setCard(await lookupGiftCard(card.code));
     void qc.invalidateQueries({ queryKey: ['card-history', card.id] });
+    void qc.invalidateQueries({ queryKey: ['gift-cards'] });
   };
   const reloadM = useMutation({
     mutationFn: () => reloadGiftCard(card!.id, parseDollars(reload) ?? 0, null),
@@ -147,6 +158,7 @@ function Lookup({ card, setCard }: { card: GiftCard | null; setCard: (c: GiftCar
       toast.good(`Moved ${formatCents(r.moved_cents)} to ${formatCode(r.card.code)}`, 'Print the new card for the customer.');
       setReason('');
       setCard(r.card);
+      void qc.invalidateQueries({ queryKey: ['gift-cards'] });
     },
     onError: toast.error,
   });
@@ -309,20 +321,34 @@ function Issue({ onIssued }: { onIssued: (c: GiftCard) => void }) {
 }
 
 function AllCards({ onOpen }: { onOpen: (c: GiftCard) => void }) {
-  const q = useQuery({ queryKey: ['gift-cards'], queryFn: listGiftCards });
   const [onlyBalance, setOnlyBalance] = useState(true);
-  const rows = (q.data ?? []).filter((c) => !onlyBalance || c.balance_cents > 0);
-  const owed = rows.filter((c) => c.type === 'paid').reduce((s, c) => s + c.balance_cents, 0);
+  // The database filters before the 500-card limit, and the totals come
+  // from every card, not from this (possibly cut-off) list.
+  const q = useQuery({ queryKey: ['gift-cards', 'list', { onlyWithMoney: onlyBalance }], queryFn: () => listGiftCards({ onlyWithMoney: onlyBalance }) });
+  const totals = useQuery({ queryKey: ['gift-cards', 'totals'], queryFn: giftCardTotals });
+  const rows = q.data ?? [];
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={onlyBalance} onChange={(e) => setOnlyBalance(e.target.checked)} className="size-4 accent-[var(--navy)]" /> Only cards with money on them
         </label>
-        <span className="text-sm text-ink-2">
-          The store owes <AnimatedNumber value={owed} className="num font-semibold text-ink" /> on paid cards
-        </span>
+        {totals.data ? (
+          <span className="text-sm text-ink-2">
+            The store owes <AnimatedNumber value={totals.data.paid_outstanding_cents} className="num font-semibold text-ink" /> on paid cards
+            <span className="text-ink-3">
+              {' '}
+              · {formatCents(totals.data.promo_outstanding_cents)} on promo cards · {totals.data.cards_with_balance} card{totals.data.cards_with_balance === 1 ? '' : 's'} with money
+            </span>
+          </span>
+        ) : (
+          <span className="text-sm text-ink-3">{totals.isError ? 'Could not load the totals.' : 'Adding up every card…'}</span>
+        )}
       </div>
+      <ErrorNote error={q.error} />
+      {rows.length >= GIFT_CARD_LIST_LIMIT && (
+        <p className="text-xs text-ink-3">Showing the newest {GIFT_CARD_LIST_LIMIT} cards. Look up a card by its code to see an older one; the totals above count every card.</p>
+      )}
       <DataTable
         rows={rows}
         rowKey={(c) => c.id}
