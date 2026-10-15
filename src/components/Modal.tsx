@@ -27,11 +27,18 @@ export function Modal({
 }) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
+  // Callers pass a new onClose on every render; keep the latest in a ref so
+  // focus is saved and restored once per opening, not on every re-render
+  // (which would pull focus out of the dialog mid-typing).
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissable) onClose();
+      if (e.key === 'Escape' && dismissable) closeRef.current();
     };
     window.addEventListener('keydown', onKey);
     const prev = document.activeElement as HTMLElement | null;
@@ -44,7 +51,7 @@ export function Modal({
       clearTimeout(t);
       prev?.focus?.();
     };
-  }, [open, onClose, dismissable]);
+  }, [open, dismissable]);
 
   const width = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl' }[size];
 

@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useInView } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { completeSale, shiftSummary, type SalePayload } from '../../api/register';
-import { ApiError } from '../../api/rpc';
 import type { Product, Shift } from '../../api/types';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { Tabs } from '../../components/Tabs';
@@ -19,6 +18,7 @@ import { createScanDetector } from '../../lib/scanner';
 import { addLoad, addProduct, emptyCart, qtyInCart, toLinesInput, totals, type Cart } from './cart';
 import { CartPanel } from './CartPanel';
 import { FailedSales } from './FailedSales';
+import { UnconfirmedSale } from './UnconfirmedSale';
 import { OutagePanel } from './OutagePanel';
 import { PaymentModal } from './PaymentModal';
 import { ProductGrid } from './ProductGrid';
@@ -45,9 +45,9 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
   const [menu, setMenu] = useState(false);
   const [queue, setQueue] = useState<QueuedSale[]>([]);
   const search = useRef<HTMLInputElement>(null);
-  // One id per checkout: a retry after a lost answer sends the same id, so the
-  // server returns the sale it already saved instead of ringing it twice.
-  const checkoutId = useRef<string | null>(null);
+  // A gift card sale whose answer was lost, held exactly as sent until the
+  // server confirms it (see UnconfirmedSale).
+  const [unconfirmed, setUnconfirmed] = useState<{ payload: SalePayload; change: number } | null>(null);
   const cartBox = useRef<HTMLDivElement>(null);
   const cartInView = useInView(cartBox, { amount: 0.2 });
   const panel: Panel = params.get('tab') === 'outage' ? 'outage' : 'sell';
@@ -121,11 +121,12 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
       } catch (err) {
         // A gift card sale never waits in the queue: a new card's code has to
         // be printed now, and a card payment has to be checked against the
-        // balance before the customer leaves.
+        // balance before the customer leaves. Its outcome is unknown, so it
+        // is held as sent until the server confirms it.
         const hasCards =
           payload.p_lines.some((l) => l.kind === 'gift_card_load') || payload.p_payments.some((p) => p.method !== 'cash');
         if (isNetworkError(err) && hasCards) {
-          throw new ApiError('Gift cards need the server. Try again in a moment; the sale will not be rung twice.', 'network');
+          return { result: null, offline: false, unconfirmed: true };
         }
         if (isNetworkError(err)) {
           await enqueueSale({
@@ -139,8 +140,14 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
         throw err;
       }
     },
-    onSuccess: ({ result, offline }, { change }) => {
-      checkoutId.current = null;
+    onSuccess: ({ result, offline, unconfirmed: unknown }, { payload, change }) => {
+      if (unknown) {
+        setUnconfirmed({ payload, change });
+        setPaying(false);
+        toast.bad('No answer from the server', 'The sale may already be saved. Use Send again before ringing anything else.');
+        return;
+      }
+      setUnconfirmed(null);
       setDone({
         number: result?.sale.number ?? null,
         total: result?.sale.total_cents ?? totals(cart).total,
@@ -155,7 +162,11 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
       void qc.invalidateQueries({ queryKey: ['products'] });
       void qc.invalidateQueries({ queryKey: ['shift', shift.id] });
     },
-    onError: toast.error,
+    onError: (err, { payload }) => {
+      // The server answered with a reason, so nothing was saved.
+      setUnconfirmed((u) => (u && u.payload.p_client_uuid === payload.p_client_uuid ? null : u));
+      toast.error(err);
+    },
   });
 
   const training = cart.type === 'training';
@@ -168,7 +179,9 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
   const rejectedHere = queuedHere.filter((q) => q.error).length;
   const waitingHere = onThisShift - rejectedHere;
   const plural = (n: number) => (n === 1 ? '' : 's');
-  const closeHint = rejectedHere
+  const closeHint = unconfirmed
+    ? 'A sale is not confirmed yet. Send it again first.'
+    : rejectedHere
     ? `${rejectedHere} sale${plural(rejectedHere)} on this shift could not be saved. Retry or dismiss ${rejectedHere === 1 ? 'it' : 'them'} first.`
     : waitingHere
       ? `${waitingHere} sale${plural(waitingHere)} on this shift ${waitingHere === 1 ? 'is' : 'are'} still waiting to send. ${waitingHere === 1 ? 'It goes' : 'They go'} out when the server answers.`
@@ -249,7 +262,7 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
                   <MenuItem icon={HandCoins} label="Cash handoff" onClick={() => setModal('handoff')} disabled={!online} />
                   <MenuItem icon={RefreshCw} label={panel === 'outage' ? 'Back to selling' : 'Outage entry'} onClick={() => setParams(panel === 'outage' ? {} : { tab: 'outage' })} />
                   <MenuItem icon={ArrowLeftRight} label="Switch shift" onClick={onSwitch} />
-                  <MenuItem icon={Lock} label="Close shift" onClick={() => setModal('close')} disabled={!online || onThisShift > 0} hint={closeHint} />
+                  <MenuItem icon={Lock} label="Close shift" onClick={() => setModal('close')} disabled={!online || onThisShift > 0 || unconfirmed !== null} hint={closeHint} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -266,6 +279,19 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
         value={panel}
         onChange={(t) => setParams(t === 'outage' ? { tab: 'outage' } : {})}
       />
+
+      <AnimatePresence>
+        {unconfirmed && (
+          <UnconfirmedSale
+            key={unconfirmed.payload.p_client_uuid}
+            payload={unconfirmed.payload}
+            products={list}
+            busy={sell.isPending}
+            onSend={() => sell.mutate(unconfirmed)}
+            onCancel={() => setUnconfirmed(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {failed.length > 0 && (
@@ -299,7 +325,10 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
               online={online}
               onAddLoad={() => setModal('load')}
               onPay={() => {
-                checkoutId.current = null;
+                if (unconfirmed) {
+                  toast.bad('Confirm the last sale first', 'Use Send again on the sale that is not confirmed.');
+                  return;
+                }
                 setPayKey((k) => k + 1);
                 setPaying(true);
               }}
@@ -340,10 +369,9 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
             toast.bad('Gift cards need a connection', 'Take cash, or wait until the connection is back.');
             return;
           }
-          checkoutId.current ??= crypto.randomUUID();
           sell.mutate({
             payload: {
-              p_client_uuid: checkoutId.current,
+              p_client_uuid: crypto.randomUUID(),
               p_shift_id: shift.id,
               p_type: cart.type,
               p_lines: toLinesInput(cart),

@@ -141,7 +141,7 @@ test('a barcode scan adds the item with that UPC', async ({ page }) => {
   await expect(page.locator('li').filter({ hasText: 'Nacho Chips 1 oz' })).toBeVisible();
 });
 
-test('a gift card sale that hits a server error is not queued, and the retry gets the card back', async ({ page }) => {
+test('a gift card sale with no answer is held, locks checkout, and Send again gets the card back', async ({ page }) => {
   test.skip(test.info().project.name === 'phone', 'Same flow as desktop');
   let tries = 0;
   const mock = await mockBackend(page, register, {
@@ -166,17 +166,42 @@ test('a gift card sale that hits a server error is not queued, and the retry get
   await page.getByRole('button', { name: 'Add to cart' }).click();
   await page.getByRole('button', { name: 'Checkout' }).click();
   await page.getByRole('button', { name: 'Exact', exact: true }).click();
-  const complete = page.getByRole('button', { name: /Exact cash \$20\.00|Complete sale/ });
-  await complete.click();
-  await expect(page.getByText('Gift cards need the server')).toBeVisible();
-  await expect(page.getByText(/Saved offline/i)).toHaveCount(0);
+  await page.getByRole('button', { name: /Exact cash \$20\.00|Complete sale/ }).click();
 
-  await complete.click();
+  // Held, not queued, and checkout is locked so it can't be rung twice.
+  const held = page.getByRole('alert').filter({ hasText: 'Sale not confirmed' });
+  await expect(held).toBeVisible();
+  await expect(held.getByText('New gift card')).toBeVisible();
+  await expect(page.getByText(/sales? waiting/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Checkout' }).click();
+  await expect(page.getByText('Confirm the last sale first')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await held.getByRole('button', { name: 'Send again' }).click();
   await expect(page.getByText('Sale #102 done')).toBeVisible();
   await expect(page.getByText(/ABCDE.?FGHJK/)).toBeVisible();
-  const ids = mock.calls.filter((c) => c.fn === 'complete_sale').map((c) => c.body.p_client_uuid);
-  expect(ids).toHaveLength(2);
-  expect(ids[1]).toBe(ids[0]);
+  await expect(held).toHaveCount(0);
+  const sent = mock.calls.filter((c) => c.fn === 'complete_sale').map((c) => c.body);
+  expect(sent).toHaveLength(2);
+  expect(sent[1]).toEqual(sent[0]);
+});
+
+test('typing in the payment screen keeps focus when the register re-renders', async ({ page }) => {
+  test.skip(test.info().project.name === 'phone', 'Keyboard flow on the store laptop');
+  await page.clock.install();
+  await mockBackend(page, register, { my_open_shifts: () => [shift], shift_summary: () => ({ ...shift, sales: [], handoffs: [], by_method: {} }) });
+  await page.goto('/register');
+  await page.getByRole('button', { name: /Water Bottle 16.9 oz/ }).click();
+  await page.getByRole('button', { name: 'Checkout' }).click();
+  const cash = page.getByRole('textbox', { name: 'Cash given' });
+  await cash.click();
+  await page.keyboard.type('5');
+  // The register checks its offline queue every 30 seconds, which re-renders
+  // it under the dialog.
+  await page.clock.runFor(31_000);
+  await page.keyboard.type('.00');
+  await expect(cash).toHaveValue('5.00');
+  await expect(cash).toBeFocused();
 });
 
 test('sales made offline wait in the queue and go out when the connection is back', async ({ page, context }) => {
