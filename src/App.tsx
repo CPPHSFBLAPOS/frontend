@@ -148,7 +148,7 @@ function NotConfigured() {
         <h1 className="display text-2xl font-bold">CPPHS FBLA Store</h1>
         <p className="mt-2 text-ink-2">
           Set <code className="num">VITE_SUPABASE_URL</code> and <code className="num">VITE_SUPABASE_ANON_KEY</code> (see{' '}
-          <code className="num">.env.example</code>) and reload.
+          <code className="num">.env.example</code>), then redeploy the site: these values are built into the app.
         </p>
       </Card>
     </div>

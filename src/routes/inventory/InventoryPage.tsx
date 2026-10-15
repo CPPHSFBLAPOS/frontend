@@ -14,7 +14,7 @@ import {
   saveCountLine,
   startCount,
 } from '../../api/catalog';
-import { productImageUrl } from '../../api/storage';
+import { imageCrossOrigin, productImageUrl } from '../../api/storage';
 import type { Product } from '../../api/types';
 import { DataTable } from '../../components/DataTable';
 import { Tabs } from '../../components/Tabs';
@@ -135,7 +135,7 @@ function ProductsTab({
               return (
                 <span className="flex items-center gap-3">
                   <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-field">
-                    {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : <ImageOff className="size-4 text-ink-3 opacity-60" />}
+                    {img ? <img src={img} crossOrigin={imageCrossOrigin(img)} alt="" className="h-full w-full object-cover" /> : <ImageOff className="size-4 text-ink-3 opacity-60" />}
                   </span>
                   <span>
                     <span className="flex items-center gap-1.5 font-semibold">

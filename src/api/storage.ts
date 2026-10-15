@@ -24,6 +24,13 @@ export function productImageUrl(path: string | null): string | null {
   return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
+// Product images from our own Storage load with CORS, so the service worker
+// gets a readable response it can keep for offline use (an opaque one is never
+// cached). Images from anywhere else load as before.
+export function imageCrossOrigin(url: string | null): 'anonymous' | undefined {
+  return url && url.includes('/storage/v1/object/public/product-images/') ? 'anonymous' : undefined;
+}
+
 export function dataUrlToBlob(dataUrl: string): Blob {
   const [meta, b64] = dataUrl.split(',');
   const type = /data:([^;]+)/.exec(meta)?.[1] ?? 'application/octet-stream';

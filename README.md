@@ -51,11 +51,11 @@ The full-stack run needs `supabase start` and `netlify dev` running in the backe
 
 ## Deploying
 
-Deploy the backend first (its README's Deploying section covers Supabase and the functions site).
+Deploy the backend first (its README's Deploying section covers Supabase, the functions site, and picking both site names).
 
 1. Make `main` the default branch of this repo. Netlify uses the default branch as production.
-2. In `netlify.toml`, point the `/api/*` redirect at the backend site's real address. It is `https://cpphs-fbla-store-api.netlify.app` only if the backend site was renamed to exactly that; otherwise members' sign-in tokens would go to whoever owns that name.
-3. Create a Netlify site from this repo on the store's team, production branch `main`, deploy previews on, branch deploys off. Build command and publish directory come from `netlify.toml`.
-4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the site's build settings. They are public by design; never add a secret with a `VITE_` prefix.
-5. On the first deploy preview, open `/api/health` (every `configured` flag should be true), sign in with an emailed code, and run one Sam's Club lookup.
+2. In `netlify.toml`, point the `/api/*` redirect at the backend site's real address. It is `https://cpphs-fbla-store-api.netlify.app` only if the backend site is named exactly that; otherwise members' sign-in tokens would go to whoever owns that name.
+3. Create a Netlify site from this repo on the store's team with the name you picked (for example `cpphs-fbla-store`), production branch `main`, deploy previews on, branch deploys off. Build command and publish directory come from `netlify.toml`.
+4. Before the first deploy, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the project's **Publishable key**, `sb_publishable_...`) on the setup screen. Vite builds them into the app, so if you add or change them later, redeploy (Deploys > Trigger deploy > Deploy site; 15 credits). They are public by design; never add a secret with a `VITE_` prefix.
+5. Check, on the production address: `/api/health` returns every `configured` flag true, you can sign in with an emailed code, and one Sam's Club lookup works.
 6. Pull requests get deploy previews (free). Merge to `main` about once a week to save credits.

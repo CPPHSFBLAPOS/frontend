@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { adjustStock, archiveProduct, productHistory, saveProduct, setProductCost } from '../../api/catalog';
-import { productImageUrl, uploadFile } from '../../api/storage';
+import { imageCrossOrigin, productImageUrl, uploadFile } from '../../api/storage';
 import type { Category, MovementType, Product } from '../../api/types';
 import { useToast } from '../../components/Toast';
 import { Button, ErrorNote, Field, Input, MoneyInput, Pill, Select, Textarea, cx } from '../../components/ui';
@@ -126,7 +126,7 @@ function Editor({ product, categories, onClose }: { product: Product | null; cat
         <div className="grid gap-4">
           <div className="flex gap-4">
             <label className="group relative grid size-28 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-xl border border-dashed border-rule-2 bg-field">
-              {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : <ImagePlus className="size-6 text-ink-3" />}
+              {img ? <img src={img} crossOrigin={imageCrossOrigin(img)} alt="" className="h-full w-full object-cover" /> : <ImagePlus className="size-6 text-ink-3" />}
               <span className="absolute inset-x-0 bottom-0 bg-ink/60 py-1 text-center text-[11px] font-semibold text-paper opacity-0 transition-opacity group-hover:opacity-100">
                 {uploading ? 'Uploading…' : 'Change photo'}
               </span>

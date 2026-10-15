@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useInView } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { completeSale, shiftSummary, type SalePayload } from '../../api/register';
+import { ApiError } from '../../api/rpc';
 import type { Product, Shift } from '../../api/types';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { Tabs } from '../../components/Tabs';
@@ -44,6 +45,9 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
   const [menu, setMenu] = useState(false);
   const [queue, setQueue] = useState<QueuedSale[]>([]);
   const search = useRef<HTMLInputElement>(null);
+  // One id per checkout: a retry after a lost answer sends the same id, so the
+  // server returns the sale it already saved instead of ringing it twice.
+  const checkoutId = useRef<string | null>(null);
   const cartBox = useRef<HTMLDivElement>(null);
   const cartInView = useInView(cartBox, { amount: 0.2 });
   const panel: Panel = params.get('tab') === 'outage' ? 'outage' : 'sell';
@@ -115,6 +119,14 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
       try {
         return { result: await completeSale(payload), offline: false };
       } catch (err) {
+        // A gift card sale never waits in the queue: a new card's code has to
+        // be printed now, and a card payment has to be checked against the
+        // balance before the customer leaves.
+        const hasCards =
+          payload.p_lines.some((l) => l.kind === 'gift_card_load') || payload.p_payments.some((p) => p.method !== 'cash');
+        if (isNetworkError(err) && hasCards) {
+          throw new ApiError('Gift cards need the server. Try again in a moment; the sale will not be rung twice.', 'network');
+        }
         if (isNetworkError(err)) {
           await enqueueSale({
             client_uuid: payload.p_client_uuid,
@@ -128,6 +140,7 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
       }
     },
     onSuccess: ({ result, offline }, { change }) => {
+      checkoutId.current = null;
       setDone({
         number: result?.sale.number ?? null,
         total: result?.sale.total_cents ?? totals(cart).total,
@@ -286,6 +299,7 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
               online={online}
               onAddLoad={() => setModal('load')}
               onPay={() => {
+                checkoutId.current = null;
                 setPayKey((k) => k + 1);
                 setPaying(true);
               }}
@@ -326,9 +340,10 @@ export function RegisterScreen({ shift, onClosed, onSwitch }: { shift: Shift; on
             toast.bad('Gift cards need a connection', 'Take cash, or wait until the connection is back.');
             return;
           }
+          checkoutId.current ??= crypto.randomUUID();
           sell.mutate({
             payload: {
-              p_client_uuid: crypto.randomUUID(),
+              p_client_uuid: checkoutId.current,
               p_shift_id: shift.id,
               p_type: cart.type,
               p_lines: toLinesInput(cart),

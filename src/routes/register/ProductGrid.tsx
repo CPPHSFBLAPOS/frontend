@@ -1,7 +1,7 @@
 import { ImageOff, Leaf, Search } from 'lucide-react';
 import { AnimatePresence, motion, useAnimationControls } from 'motion/react';
 import { forwardRef, useMemo, useState } from 'react';
-import { productImageUrl } from '../../api/storage';
+import { imageCrossOrigin, productImageUrl } from '../../api/storage';
 import type { Category, Product } from '../../api/types';
 import { shake } from '../../components/motion';
 import { cx } from '../../components/ui';
@@ -125,7 +125,7 @@ function Tile({ product, left, onTap, bumps, training }: { product: Product; lef
     >
       <div className="relative h-16 w-full bg-field">
         {img ? (
-          <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <img src={img} crossOrigin={imageCrossOrigin(img)} alt="" className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <div className="grid h-full place-items-center text-ink-3">
             <ImageOff className="size-5 opacity-50" />

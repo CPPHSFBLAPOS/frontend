@@ -141,6 +141,44 @@ test('a barcode scan adds the item with that UPC', async ({ page }) => {
   await expect(page.locator('li').filter({ hasText: 'Nacho Chips 1 oz' })).toBeVisible();
 });
 
+test('a gift card sale that hits a server error is not queued, and the retry gets the card back', async ({ page }) => {
+  test.skip(test.info().project.name === 'phone', 'Same flow as desktop');
+  let tries = 0;
+  const mock = await mockBackend(page, register, {
+    my_open_shifts: () => [shift],
+    shift_summary: () => ({ ...shift, sales: [], handoffs: [], by_method: {} }),
+    complete_sale: () => {
+      tries += 1;
+      // The first answer is lost at the gateway after the sale was saved.
+      if (tries === 1) throw Object.assign(new Error('upstream request timeout'), { status: 504 });
+      return {
+        ok: true,
+        duplicate: true,
+        change_cents: 0,
+        new_cards: [{ id: 'g1', code: 'ABCDEFGHJK', amount_cents: 2000 }],
+        sale: { id: 's1', number: 102, total_cents: 2000, lines: [], payments: [], refunds: [] },
+      };
+    },
+  });
+  await page.goto('/register');
+  await page.getByRole('button', { name: 'Sell or reload a gift card' }).click();
+  await page.getByPlaceholder('10.00').fill('20.00');
+  await page.getByRole('button', { name: 'Add to cart' }).click();
+  await page.getByRole('button', { name: 'Checkout' }).click();
+  await page.getByRole('button', { name: 'Exact', exact: true }).click();
+  const complete = page.getByRole('button', { name: /Exact cash \$20\.00|Complete sale/ });
+  await complete.click();
+  await expect(page.getByText('Gift cards need the server')).toBeVisible();
+  await expect(page.getByText(/Saved offline/i)).toHaveCount(0);
+
+  await complete.click();
+  await expect(page.getByText('Sale #102 done')).toBeVisible();
+  await expect(page.getByText(/ABCDE.?FGHJK/)).toBeVisible();
+  const ids = mock.calls.filter((c) => c.fn === 'complete_sale').map((c) => c.body.p_client_uuid);
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).toBe(ids[0]);
+});
+
 test('sales made offline wait in the queue and go out when the connection is back', async ({ page, context }) => {
   const mock = await mockBackend(page, register, {
     my_open_shifts: () => [shift],

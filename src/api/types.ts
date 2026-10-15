@@ -250,7 +250,6 @@ export type SaleLine = {
 export type Sale = {
   id: string;
   number: number;
-  client_uuid: string;
   shift_id: string | null;
   cashier_id: string;
   cashier_name: string;

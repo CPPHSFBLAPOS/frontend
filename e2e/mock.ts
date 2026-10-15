@@ -175,6 +175,10 @@ export async function mockBackend(page: Page, me: Me | null, rpc: Record<string,
     try {
       return json(route, handler(body));
     } catch (err) {
+      // A handler can throw an error with a status to act like the gateway
+      // (502/503/504 without a Postgres code).
+      const status = (err as { status?: number }).status;
+      if (status) return json(route, { message: (err as Error).message }, status);
       return json(route, { message: (err as Error).message, code: 'P0001' }, 400);
     }
   });
