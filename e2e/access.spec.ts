@@ -60,7 +60,7 @@ test('a brand-new email joins as a Cashier and waits for a Super Admin to set th
 
   await page.goto('/');
   await page.getByLabel('School email').fill(newCashier.email);
-  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
   const code = page.getByLabel('Code from your email');
   await code.fill('123456');
   await code.press('Enter');
@@ -115,19 +115,19 @@ test('a sign-in that is not an email code is told to sign in again', async ({ pa
 test('the sign-in screen shows the server’s words when access was removed, and a readable rate limit', async ({ page }) => {
   await mockBackend(page, null);
   let answer = { status: 403, body: { code: 403, error_code: 'hook_error', msg: BLOCKED } };
-  await page.route(`${SUPABASE}/auth/v1/otp`, (route) =>
+  await page.route(`${SUPABASE}/auth/v1/otp**`, (route) =>
     route.fulfill({ status: answer.status, contentType: 'application/json', body: JSON.stringify(answer.body) }),
   );
   await page.goto('/');
   await page.getByLabel('School email').fill('blocked@example.com');
-  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
   await expect(page.getByRole('alert').filter({ hasText: BLOCKED })).toBeVisible();
   await expect(page.getByText('Ask the Advisor to add you.')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Check your email' })).toHaveCount(0);
 
   answer = { status: 429, body: { code: 429, error_code: 'over_email_send_rate_limit', msg: 'Email rate limit exceeded' } };
-  await page.getByRole('button', { name: 'Email me a code' }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Too many codes were asked for. Wait a few minutes, then try again.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Too many sign-in emails were sent this hour. Wait a while, then try again.' })).toBeVisible();
 });
 
 test('only Super Admins manage members: the Advisor sees no Members link or page', async ({ page }) => {

@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ensureMember, recordSignIn, whoami } from '../api/auth';
+import { ensureMember, recordSignIn, takeSignInLinkProblem, whoami } from '../api/auth';
 import { supabase } from '../api/supabase';
 import type { Me, Permission } from '../api/types';
 import { useToast } from '../components/Toast';
@@ -22,6 +22,8 @@ type AuthState = {
   waiting: boolean;
   // Loading who you are failed (no connection, server error).
   error: string | null;
+  // The page was opened from a sign-in link that did not sign anyone in.
+  linkProblem: string | null;
   retry: () => void;
   can: (p: Permission) => boolean;
 };
@@ -35,6 +37,7 @@ const AuthContext = createContext<AuthState>({
   problem: null,
   waiting: false,
   error: null,
+  linkProblem: null,
   retry: () => {},
   can: () => false,
 });
@@ -42,6 +45,7 @@ const AuthContext = createContext<AuthState>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
+  const [linkProblem, setLinkProblem] = useState<string | null>(null);
   const qc = useQueryClient();
   const toast = useToast();
   // Who signed in and has not had record_sign_in yet. It runs once the
@@ -50,7 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const welcomed = useRef<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    void Promise.all([takeSignInLinkProblem().catch(() => null), supabase.auth.getSession()]).then(([problem, { data }]) => {
+      setLinkProblem(problem);
       setSession(data.session);
       setReady(true);
     });
@@ -112,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     problem: noMember ? (result?.problem?.message ?? null) : null,
     waiting: isWaitingForApproval(me),
     error: Boolean(session) && !me && meQuery.isError ? (meQuery.error instanceof Error ? meQuery.error.message : String(meQuery.error)) : null,
+    linkProblem,
     retry: () => void meQuery.refetch(),
     can: (p) => Boolean(me?.permissions.includes(p)),
   };

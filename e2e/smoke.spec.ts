@@ -24,7 +24,7 @@ test('sign-in asks for a school email, then the code', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await shot(page, 'sign-in');
   await page.getByLabel('School email').fill('treasurer@example.com');
-  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
   await expect(page.getByLabel('Code from your email')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
@@ -34,7 +34,7 @@ test('a pasted 8-digit code is kept whole and sent with Enter', async ({ page })
   await mockBackend(page, null);
   await page.goto('/');
   await page.getByLabel('School email').fill('treasurer@example.com');
-  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
   const box = page.getByLabel('Code from your email');
   await expect(box).toBeVisible();
 

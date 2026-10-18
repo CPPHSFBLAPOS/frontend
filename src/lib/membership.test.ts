@@ -88,7 +88,19 @@ describe('signInErrorMessage', () => {
       'For security purposes, you can only request this after 42 seconds.',
     );
     expect(signInErrorMessage({ message: 'Email rate limit exceeded', status: 429, code: 'over_email_send_rate_limit' })).toBe(
-      'Too many codes were asked for. Wait a few minutes, then try again.',
+      'Too many sign-in emails were sent this hour. Wait a while, then try again.',
+    );
+  });
+
+  it('explains email setup problems instead of a server error', () => {
+    expect(
+      signInErrorMessage({ message: 'Email address "kid@cppasd.com" cannot be used as it is not authorized', status: 400, code: 'email_address_not_authorized' }),
+    ).toBe('The store can only email its Supabase team right now. A Super Admin has to finish the email setup.');
+    expect(signInErrorMessage({ message: 'Error sending confirmation email', status: 500, code: 'unexpected_failure' })).toBe(
+      'The sign-in email could not be sent. A Super Admin should check the email settings in Supabase.',
+    );
+    expect(signInErrorMessage({ message: 'Error sending magic link email', status: 500 })).toBe(
+      'The sign-in email could not be sent. A Super Admin should check the email settings in Supabase.',
     );
   });
 

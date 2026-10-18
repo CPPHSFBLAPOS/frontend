@@ -42,7 +42,9 @@ export function setDeviceName(name: string): string {
   return deviceName();
 }
 
+// PKCE: a sign-in link signs in only the browser that asked for the email,
+// so a link someone else made can't sign this browser in to their account.
 export const supabase = createClient(url ?? 'http://localhost:54321', anonKey ?? 'missing-anon-key', {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
   global: { headers: { 'x-fbla-device': deviceName() } },
 });

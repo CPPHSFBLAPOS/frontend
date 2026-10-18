@@ -1,17 +1,21 @@
 import { z } from 'zod';
 import { signInErrorMessage } from '../lib/membership';
+import { hasLinkCode, signInLinkProblem, withoutSignInParams } from '../lib/signInLink';
 import { rpc } from './rpc';
 import { supabase } from './supabase';
 import type { EnsureMemberResult, Me, Permission, Role } from './types';
 
-// Anyone signs in with a one-time code emailed to them. The database's
-// before-user-created hook turns away only an email that belongs to a
-// deactivated (blocked) member; the first sign-in makes everyone else a
+// Anyone signs in with an emailed one-time code, or with the link in the
+// email when the project sends Supabase's own emails (no custom SMTP). The
+// database's before-user-created hook turns away only an email that belongs
+// to a deactivated (blocked) member; the first sign-in makes everyone else a
 // Cashier through ensureMember().
 export async function sendCode(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true },
+    // The link comes back to this address. Supabase uses it only when it is
+    // in the project's Redirect URLs, and falls back to the Site URL.
+    options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
   });
   if (error) throw new Error(signInErrorMessage({ message: error.message, status: error.status, code: error.code }));
 }
@@ -22,6 +26,22 @@ export async function verifyCode(email: string, code: string): Promise<void> {
     if (/expired|invalid/i.test(error.message)) throw new Error('That code is wrong or expired. Ask for a new one.');
     throw new Error(signInErrorMessage({ message: error.message, status: error.status, code: error.code }));
   }
+}
+
+// Waits for the Supabase client to read a sign-in link this page was opened
+// from, takes the link's leftovers out of the address bar, and says what
+// went wrong if it did not sign anyone in. Runs once per page load, so a
+// second caller gets the same answer instead of reading the cleaned address.
+let linkProblem: Promise<string | null> | null = null;
+export function takeSignInLinkProblem(): Promise<string | null> {
+  linkProblem ??= supabase.auth.initialize().then(({ error }) => {
+    const href = window.location.href;
+    const problem = signInLinkProblem({ error, leftoverCode: hasLinkCode(href) });
+    const clean = withoutSignInParams(href);
+    if (clean !== href) window.history.replaceState(window.history.state, '', clean);
+    return problem;
+  });
+  return linkProblem;
 }
 
 export async function signOut(): Promise<void> {

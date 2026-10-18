@@ -14,7 +14,7 @@ export async function signIn(page: Page, email: string) {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   await page.goto('/');
   await page.getByLabel('School email').fill(email);
-  await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
   const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
   if (error) throw error;

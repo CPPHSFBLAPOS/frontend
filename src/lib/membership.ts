@@ -43,7 +43,15 @@ export function signInErrorMessage(err: { message?: string | null; status?: numb
   if (err.status === 429 || /rate limit/i.test(message) || /^over_.*rate_limit$/.test(err.code ?? '')) {
     // "For security purposes, you can only request this after 42 seconds."
     if (/after \d+ seconds?/i.test(message)) return message;
-    return 'Too many codes were asked for. Wait a few minutes, then try again.';
+    return 'Too many sign-in emails were sent this hour. Wait a while, then try again.';
+  }
+  // Supabase's own email service (no custom SMTP) only emails the people on
+  // the Supabase project's team.
+  if (err.code === 'email_address_not_authorized' || /email address .* not authorized/i.test(message)) {
+    return 'The store can only email its Supabase team right now. A Super Admin has to finish the email setup.';
+  }
+  if (/error sending .*email/i.test(message)) {
+    return 'The sign-in email could not be sent. A Super Admin should check the email settings in Supabase.';
   }
   if (/signups? (are )?not allowed|signup(s)? (is |are )?disabled/i.test(message) || err.code === 'signup_disabled') {
     return 'New sign-ups are switched off for the store app. Talk to a Super Admin.';

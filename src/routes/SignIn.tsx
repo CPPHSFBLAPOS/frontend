@@ -4,6 +4,7 @@ import { useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent
 import { sendCode, verifyCode } from '../api/auth';
 import { shake, spring } from '../components/motion';
 import { Button, Field, Input, cx } from '../components/ui';
+import { useAuth } from '../hooks/useAuth';
 
 // Supabase sends 6-digit codes by default, but the hosted project's "Email
 // OTP length" setting can make them up to 10. Accept anything from 6 to 10
@@ -16,13 +17,17 @@ const OTP_LENGTH = Number.isInteger(envLength) && envLength >= MIN_CODE && envLe
 
 const digitsOnly = (text: string) => text.replace(/\D/g, '');
 
-// Sign in with a one-time code emailed to a school address.
+// Sign in with the code or the link in an email sent to a school address.
+// Which one the email has depends on the Supabase project: its own emails
+// carry a link, the custom template (supabase/templates in the backend) a code.
 export function SignIn() {
+  const { linkProblem } = useAuth();
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Opened from a sign-in link that did not work: say why straight away.
+  const [error, setError] = useState<string | null>(linkProblem);
   const codeBox = useRef<HTMLInputElement>(null);
   const controls = useAnimationControls();
   const ready = code.length >= MIN_CODE && code.length <= MAX_CODE;
@@ -133,14 +138,14 @@ export function SignIn() {
                 <div>
                   <img src="/favicon.svg" alt="" className="mb-5 size-12 rounded-xl lg:hidden" />
                   <h2 className="display text-3xl font-extrabold">Sign in</h2>
-                  <p className="mt-1 text-ink-2">We'll email a sign-in code to your school address. First time here? You join as a Cashier.</p>
+                  <p className="mt-1 text-ink-2">We'll email a sign-in link or code to your school address. First time here? You join as a Cashier.</p>
                 </div>
                 <Field label="School email">
                   <Input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@cppasd.com" />
                 </Field>
                 {error && <p role="alert" className="text-sm font-medium text-bad">{error}</p>}
                 <Button type="submit" variant="primary" size="lg" loading={busy} icon={<Mail className="size-4" />}>
-                  Email me a code
+                  Email me a sign-in link
                 </Button>
               </motion.form>
             ) : (
@@ -161,10 +166,10 @@ export function SignIn() {
                   </button>
                   <h2 className="display text-3xl font-extrabold">Check your email</h2>
                   <p className="mt-1 text-ink-2">
-                    Enter the code from your email. We sent it to <b className="text-ink">{email}</b>.
+                    We sent it to <b className="text-ink">{email}</b>. Open its sign-in link in this browser, or type its code here.
                   </p>
                 </div>
-                <Field label="Code from your email" hint="Type or paste every digit, then press Enter.">
+                <Field label="Code from your email" hint="If the email has a code, type or paste every digit, then press Enter.">
                   <motion.span
                     initial={{ opacity: 0, y: 10, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -204,7 +209,7 @@ export function SignIn() {
                   Continue
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => void submitEmail()} disabled={busy}>
-                  Send a new code
+                  Send a new email
                 </Button>
               </motion.form>
             )}
