@@ -1,7 +1,7 @@
-import { useMutation } from '@tanstack/react-query';
-import { Check, UserRound } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Check, KeyRound, UserRound } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError } from '../../api/rpc';
 import { openShift } from '../../api/register';
 import { deviceName } from '../../api/supabase';
@@ -13,14 +13,18 @@ import { Segmented } from '../../components/Tabs';
 import { Button, Card, MoneyInput, Spinner, cx } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useDirectory, useSettings } from '../../hooks/queries';
+import { useAuth } from '../../hooks/useAuth';
 import { countTotal, toBreakdown, type Counts } from '../../lib/cash';
+import { firstPinHint } from '../../lib/membership';
 import { centsToInput, formatCents, parseDollars } from '../../lib/money';
 
 // Three steps: who is working, their PIN, the opening count.
 export function OpenShift({ onOpened }: { onOpened: (shiftId: string) => void }) {
   const directory = useDirectory();
   const settings = useSettings();
+  const qc = useQueryClient();
   const toast = useToast();
+  const { me } = useAuth();
   const [cashier, setCashier] = useState<DirectoryEntry | null>(null);
   const [pin, setPin] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -29,6 +33,19 @@ export function OpenShift({ onOpened }: { onOpened: (shiftId: string) => void })
   const [total, setTotal] = useState<string>('');
 
   const people = (directory.data ?? []).filter((d) => d.role !== 'register' && (d.role || d.is_super_admin));
+  // A new sign-up has no PIN until a Super Admin sets one: say so instead of
+  // leaving their name greyed out with no way forward.
+  const pinHint = directory.isLoading ? null : firstPinHint(me, directory.data);
+  // Once a Super Admin sets the PIN, notice it without a reload.
+  useEffect(() => {
+    if (!pinHint) return;
+    const t = setInterval(() => {
+      void qc.invalidateQueries({ queryKey: ['directory'] });
+      void qc.invalidateQueries({ queryKey: ['me'] });
+    }, 15_000);
+    return () => clearInterval(t);
+  }, [pinHint, qc]);
+  const othersWithoutPin = people.some((p) => !p.has_pin && p.id !== me?.id);
   const float = settings.data?.float_cents ?? 0;
   const opening = mode === 'count' ? countTotal(counts) : (parseDollars(total || centsToInput(float)) ?? 0);
 
@@ -64,6 +81,11 @@ export function OpenShift({ onOpened }: { onOpened: (shiftId: string) => void })
         <AnimatePresence mode="wait">
           {step === 0 && (
             <motion.div key="who" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              {pinHint && (
+                <p role="status" className="mb-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2.5 text-sm font-medium text-warn">
+                  <KeyRound className="mt-0.5 size-4 shrink-0" /> {pinHint}
+                </p>
+              )}
               {directory.isLoading ? (
                 <Spinner />
               ) : (
@@ -96,6 +118,7 @@ export function OpenShift({ onOpened }: { onOpened: (shiftId: string) => void })
                   ))}
                 </motion.div>
               )}
+              {othersWithoutPin && <p className="mt-3 text-sm text-ink-3">No PIN yet? A Super Admin sets it on the Members page.</p>}
             </motion.div>
           )}
           {step === 1 && (

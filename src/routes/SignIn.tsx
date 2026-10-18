@@ -114,7 +114,7 @@ export function SignIn() {
               One app for the store: every sale, every count, every Sam's Club pre-auth, logged and signed.
             </p>
           </motion.div>
-          <p className="text-xs text-band-ink-2">Only members the Advisor has added can sign in.</p>
+          <p className="text-xs text-band-ink-2">New here? Sign in with your email and you join as a Cashier. A Super Admin sets your PIN before your first shift.</p>
         </div>
       </div>
 
@@ -133,12 +133,12 @@ export function SignIn() {
                 <div>
                   <img src="/favicon.svg" alt="" className="mb-5 size-12 rounded-xl lg:hidden" />
                   <h2 className="display text-3xl font-extrabold">Sign in</h2>
-                  <p className="mt-1 text-ink-2">We'll email a sign-in code to your school address.</p>
+                  <p className="mt-1 text-ink-2">We'll email a sign-in code to your school address. First time here? You join as a Cashier.</p>
                 </div>
                 <Field label="School email">
                   <Input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@cppasd.com" />
                 </Field>
-                {error && <p className="text-sm font-medium text-bad">{error}</p>}
+                {error && <p role="alert" className="text-sm font-medium text-bad">{error}</p>}
                 <Button type="submit" variant="primary" size="lg" loading={busy} icon={<Mail className="size-4" />}>
                   Email me a code
                 </Button>
@@ -199,7 +199,7 @@ export function SignIn() {
                     </span>
                   </motion.span>
                 </Field>
-                {error && <p className="text-sm font-medium text-bad">{error}</p>}
+                {error && <p role="alert" className="text-sm font-medium text-bad">{error}</p>}
                 <Button type="submit" variant="primary" size="lg" loading={busy} disabled={!ready} icon={<ArrowRight className="size-4" />}>
                   Continue
                 </Button>

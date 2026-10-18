@@ -31,10 +31,22 @@ export type Me = {
   active: boolean;
   has_pin: boolean;
   linked: boolean;
+  // false while a sign-up waits for a Super Admin to set their first PIN;
+  // until then they have no permissions.
+  approved?: boolean;
   permissions: Permission[];
 };
 
 export type MemberRow = Omit<Me, 'permissions'>;
+
+// ensure_member(): makes the signed-in person a Cashier the first time they
+// sign in. joined is true only on the call that created the member.
+// error is 'blocked' (a Super Admin turned their access off) or
+// 'not_allowed' (a password session, no email on the token, or an email
+// tied to another sign-in).
+export type EnsureMemberResult =
+  | { ok: true; joined: boolean; me: Me | null }
+  | { ok: false; error: string; message: string };
 
 export type DirectoryEntry = { id: string; display_name: string; role: Role | null; is_super_admin: boolean; has_pin: boolean };
 
