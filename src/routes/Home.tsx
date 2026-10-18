@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
@@ -8,23 +8,29 @@ import {
   ClipboardSignature,
   CreditCard,
   Database,
+  KeyRound,
   Loader2,
   Server,
   ShoppingCart,
   XCircle,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { Link } from 'react-router';
+import { setPin } from '../api/admin';
 import { listPreauths } from '../api/preauth';
 import { pendingOutageSales } from '../api/register';
 import { checkHealth } from '../api/rpc';
 import { supabase } from '../api/supabase';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { Modal } from '../components/Modal';
 import { item, list } from '../components/motion';
-import { Card, PageHeader, Pill, cx } from '../components/ui';
+import { useToast } from '../components/Toast';
+import { Button, Card, ErrorNote, Input, PageHeader, Pill, cx } from '../components/ui';
 import { useProducts } from '../hooks/queries';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/dates';
+import { firstPinHint } from '../lib/membership';
 import { formatCents } from '../lib/money';
 
 function Check({ label, icon: Icon, state, detail }: { label: string; icon: typeof Database; state: 'pending' | 'ok' | 'bad'; detail?: string }) {
@@ -213,10 +219,77 @@ export function Home() {
                 {me.is_super_admin && <Pill tone="gold">Super Admin</Pill>}
                 {!me.has_pin && me.role && me.role !== 'register' && <Pill tone="warn">No PIN yet</Pill>}
               </p>
+              <MyPin />
             </div>
           )}
         </Card>
       </div>
     </div>
+  );
+}
+
+// Change your own PIN. The first PIN is set by a Super Admin on the Members
+// page (the database refuses a member setting their own first PIN), so
+// people without one see that instead of a button that cannot work.
+function MyPin() {
+  const { me, can } = useAuth();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [pin, setPinValue] = useState('');
+  const save = useMutation({
+    mutationFn: () => setPin(me!.id, pin),
+    onSuccess: () => {
+      toast.good('Your PIN is changed', 'Use the new one at the register.');
+      setPinValue('');
+      setOpen(false);
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['directory'] });
+    },
+  });
+  if (!me || me.role === 'register' || (!me.role && !me.is_super_admin)) return null;
+  if (!me.has_pin && !can('manage_members')) {
+    return <p className="mt-2 text-xs text-ink-2">{firstPinHint(me)}</p>;
+  }
+  const close = () => {
+    setOpen(false);
+    setPinValue('');
+    save.reset();
+  };
+  return (
+    <>
+      <Button size="sm" variant="ghost" className="-ml-3 mt-1" icon={<KeyRound className="size-3.5" />} onClick={() => setOpen(true)}>
+        {me.has_pin ? 'Change my PIN' : 'Set my PIN'}
+      </Button>
+      <Modal
+        open={open}
+        onClose={close}
+        size="sm"
+        title={me.has_pin ? 'Change your PIN' : 'Set your PIN'}
+        subtitle="4 digits, for the register and for approvals. Do not share it."
+        footer={
+          <Button variant="primary" loading={save.isPending} disabled={!/^\d{4}$/.test(pin)} onClick={() => save.mutate()}>
+            Save PIN
+          </Button>
+        }
+      >
+        <Input
+          type="password"
+          inputMode="numeric"
+          maxLength={4}
+          autoComplete="new-password"
+          value={pin}
+          onChange={(e) => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 4))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && /^\d{4}$/.test(pin) && !save.isPending) save.mutate();
+          }}
+          className="num h-14 text-center text-3xl tracking-[0.6em]"
+          aria-label="New PIN"
+        />
+        <div className="mt-2">
+          <ErrorNote error={save.error} />
+        </div>
+      </Modal>
+    </>
   );
 }

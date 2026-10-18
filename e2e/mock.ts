@@ -34,6 +34,7 @@ export type Me = {
   active: boolean;
   has_pin: boolean;
   linked: boolean;
+  approved?: boolean;
   permissions: string[];
 };
 
@@ -141,6 +142,8 @@ export async function mockBackend(page: Page, me: Me | null, rpc: Record<string,
     offline: false,
     rpc: {
       whoami: () => me,
+      // Open sign-up: the app calls this only when whoami finds nobody.
+      ensure_member: () => ({ ok: true, joined: false, me }),
       record_sign_in: () => null,
       catalog: () => products,
       member_directory: () => directory,

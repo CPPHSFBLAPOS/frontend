@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { listMembers, saveMember, setPin, type MemberInput } from '../../api/admin';
 import type { MemberRow, Role } from '../../api/types';
 import { DataTable } from '../../components/DataTable';
 import { Modal } from '../../components/Modal';
+import { Segmented } from '../../components/Tabs';
 import { useToast } from '../../components/Toast';
 import { Button, ErrorNote, Field, Input, PageHeader, Pill, Select, Skeleton } from '../../components/ui';
 import { useAuth } from '../../hooks/useAuth';
+import { filterMembers, membersNeedingPinFirst, needsPin, type MemberFilter } from '../../lib/membership';
 
 const ROLES: Array<{ id: Role | ''; label: string }> = [
   { id: '', label: 'No role (Super Admin only)' },
@@ -18,10 +20,19 @@ const ROLES: Array<{ id: Role | ''; label: string }> = [
   { id: 'register', label: 'Register account (shared device)' },
 ];
 
+// Super Admins only (manage_members). Anyone who signs in becomes a Cashier
+// here; a Super Admin sets their first PIN, changes roles, and blocks people
+// by turning Active off.
 export default function MembersPage() {
   const q = useQuery({ queryKey: ['members'], queryFn: listMembers });
   const [editing, setEditing] = useState<MemberRow | 'new' | null>(null);
   const [pinFor, setPinFor] = useState<MemberRow | null>(null);
+  const [show, setShow] = useState<MemberFilter>('all');
+  // New sign-ups without a PIN come first; the column headers still sort.
+  const ordered = useMemo(() => membersNeedingPinFirst(q.data ?? []), [q.data]);
+  const rows = filterMembers(ordered, show);
+  const waiting = ordered.filter(needsPin).length;
+  const blocked = ordered.filter((m) => !m.active).length;
 
   return (
     <div>
@@ -34,18 +45,29 @@ export default function MembersPage() {
           </Button>
         }
       >
-        Only people on this list can sign in. The Advisor reassigns roles each fall; every change is logged. Store only what the forms need: no student ID
-        numbers.
+        Anyone who signs in becomes a Cashier. Set a PIN before their first shift. Turn Active off to block someone. Every change is logged. Store
+        only what the forms need: no student ID numbers.
       </PageHeader>
+      <div className="mb-3">
+        <Segmented
+          options={[
+            { id: 'all', label: 'Everyone' },
+            { id: 'needs_pin', label: `Needs PIN (${waiting})` },
+            { id: 'blocked', label: `Blocked (${blocked})` },
+          ]}
+          value={show}
+          onChange={setShow}
+        />
+      </div>
       {q.isLoading ? (
         <Skeleton className="h-96" />
       ) : (
         <DataTable
-          rows={q.data ?? []}
+          rows={rows}
           rowKey={(m) => m.id}
           onRowClick={setEditing}
           csvName="members"
-          initialSort={{ key: 'name', dir: 'asc' }}
+          empty={show === 'needs_pin' ? 'Everyone has a PIN.' : show === 'blocked' ? 'Nobody is blocked.' : 'Nothing here yet.'}
           columns={[
             {
               key: 'name',
@@ -65,8 +87,9 @@ export default function MembersPage() {
               label: '',
               render: (m) => (
                 <span className="flex flex-wrap gap-1">
+                  {needsPin(m) && <Pill tone="warn">Needs PIN</Pill>}
                   {m.is_super_admin && <Pill tone="gold">Super Admin</Pill>}
-                  {!m.active && <Pill tone="bad">Inactive</Pill>}
+                  {!m.active && <Pill tone="bad">Blocked</Pill>}
                   {!m.linked && m.active && <Pill>Not signed in yet</Pill>}
                 </span>
               ),
@@ -95,7 +118,7 @@ export default function MembersPage() {
         />
       )}
       <MemberModal member={editing} onClose={() => setEditing(null)} />
-      <PinModal member={pinFor} onClose={() => setPinFor(null)} />
+      <PinModal key={pinFor?.id ?? 'none'} member={pinFor} onClose={() => setPinFor(null)} />
     </div>
   );
 }
@@ -127,6 +150,8 @@ function MemberForm({ member, onClose }: { member: MemberRow | null; onClose: ()
       toast.good(member ? 'Saved' : `${m.display_name} added`, member ? undefined : 'They can sign in with a code sent to that email.');
       void qc.invalidateQueries({ queryKey: ['members'] });
       void qc.invalidateQueries({ queryKey: ['directory'] });
+      // A Super Admin may have changed their own row or PIN.
+      void qc.invalidateQueries({ queryKey: ['me'] });
       onClose();
     },
   });
@@ -167,7 +192,7 @@ function MemberForm({ member, onClose }: { member: MemberRow | null; onClose: ()
       )}
       <label className="flex items-center gap-2 text-sm font-medium">
         <input type="checkbox" checked={m.active} onChange={(e) => setM({ ...m, active: e.target.checked })} className="size-4 accent-[var(--navy)]" />
-        Active (can sign in)
+        Active. Turn off to block them: they lose access to the store app and cannot sign up again with this email.
       </label>
       <ErrorNote error={save.error} />
       <div className="flex justify-end gap-2 pt-2">
@@ -191,6 +216,8 @@ function PinModal({ member, onClose }: { member: MemberRow | null; onClose: () =
       setPinValue('');
       void qc.invalidateQueries({ queryKey: ['members'] });
       void qc.invalidateQueries({ queryKey: ['directory'] });
+      // A Super Admin may have changed their own row or PIN.
+      void qc.invalidateQueries({ queryKey: ['me'] });
       onClose();
     },
   });
